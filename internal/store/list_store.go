@@ -20,6 +20,7 @@ type ListEntry struct {
 type ListStore interface {
 	CreateList(list *List) (*List, error)
 	GetListByID(id int64) (*List, error)
+	UpdateList(list *List) error
 }
 
 type PostgresListStore struct {
@@ -64,5 +65,40 @@ func (s *PostgresListStore) CreateList(list *List) (*List, error) {
 
 func (s *PostgresListStore) GetListByID(id int64) (*List, error) {
 	list := &List{}
+
+	query :=
+		`SELECT id, title, description FROM lists WHERE id = $1`
+
+	err := s.db.QueryRow(query, id).Scan(&list.ID, &list.Title, &list.Description)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	entryQuery :=
+		`SELECT id, title, order_index FROM list_entries WHERE list_id = $1 ORDER BY order_index`
+
+	rows, err := s.db.Query(entryQuery, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var entry ListEntry
+		err = rows.Scan(
+			&entry.ID,
+			&entry.Title,
+			&entry.OrderIndex,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		list.Entries = append(list.Entries, entry)
+	}
+
 	return list, nil
 }
