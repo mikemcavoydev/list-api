@@ -1,0 +1,16 @@
+curl -X POST http://localhost:8080/lists \
+    -H "Content-Type: application/json" \
+    -d '{
+        "title": "Test List",
+        "description": "A list for testing purposes",
+        "entries": [
+            {
+                "title": "First list entry",
+                "order_index": 0
+            },
+            {
+                "title": "Second list entry",
+                "order_index": 1
+            }
+        ]
+    }'

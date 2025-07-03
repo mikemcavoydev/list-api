@@ -1,17 +1,23 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mikemcavoydev/list-api/internal/store"
 )
 
-type ListHandler struct{}
+type ListHandler struct {
+	listStore store.ListStore
+}
 
-func NewListHandler() *ListHandler {
-	return &ListHandler{}
+func NewListHandler(listStore store.ListStore) *ListHandler {
+	return &ListHandler{
+		listStore: listStore,
+	}
 }
 
 func (h *ListHandler) HandleGetListById(w http.ResponseWriter, r *http.Request) {
@@ -31,5 +37,21 @@ func (h *ListHandler) HandleGetListById(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ListHandler) HandleCreateListById(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "created a list\n")
+	var list store.List
+	err := json.NewDecoder(r.Body).Decode(&list)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "failed to create list", http.StatusInternalServerError)
+		return
+	}
+
+	createdList, err := h.listStore.CreateList(&list)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "failed to create list", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(createdList)
 }
