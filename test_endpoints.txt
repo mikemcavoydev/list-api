@@ -31,3 +31,11 @@ curl -X PUT http://localhost:8080/lists/1 \
             }
         ]
     }'
+
+curl -X POST http://localhost:8080/users \
+    -H "Content-Type: application/json" \
+    -d '{
+        "username": "johndoe",
+        "email": "john.doe@example.com",
+        "password": ""
+    }'
