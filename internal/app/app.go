@@ -33,7 +33,7 @@ func NewApplication() (*Application, error) {
 
 	listStore := store.NewPostgresListStore(pgDB)
 
-	listHandler := api.NewListHandler(listStore)
+	listHandler := api.NewListHandler(listStore, logger)
 
 	app := &Application{
 		Logger:      logger,

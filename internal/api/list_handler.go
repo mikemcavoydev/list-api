@@ -3,95 +3,86 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
-	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/mikemcavoydev/list-api/internal/store"
+	"github.com/mikemcavoydev/list-api/internal/utils"
 )
 
 type ListHandler struct {
 	listStore store.ListStore
+	logger    *log.Logger
 }
 
-func NewListHandler(listStore store.ListStore) *ListHandler {
+func NewListHandler(listStore store.ListStore, logger *log.Logger) *ListHandler {
 	return &ListHandler{
 		listStore: listStore,
+		logger:    logger,
 	}
 }
 
 func (h *ListHandler) HandleGetListById(w http.ResponseWriter, r *http.Request) {
-	paramsListID := chi.URLParam(r, "id")
-	if paramsListID == "" {
-		http.NotFound(w, r)
-		return
-	}
-
-	listID, err := strconv.ParseInt(paramsListID, 10, 64)
+	listID, err := utils.ReadIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
+		h.logger.Panicf("ERROR: readIDParam: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid list id"})
 		return
 	}
 
 	list, err := h.listStore.GetListByID(listID)
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "failed to fetch the list", http.StatusNotFound)
+		h.logger.Panicf("ERROR: getListByID: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
 		return
 	}
 
 	if list == nil {
-		http.NotFound(w, r)
+		h.logger.Panicf("ERROR: getListByID: %v", err)
+		utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "list not found"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(list)
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"list": list})
 }
 
 func (h *ListHandler) HandleCreateListById(w http.ResponseWriter, r *http.Request) {
 	var list store.List
 	err := json.NewDecoder(r.Body).Decode(&list)
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "failed to create list", http.StatusInternalServerError)
+		h.logger.Panicf("ERROR: decodingCreateList: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid request sent"})
 		return
 	}
 
 	createdList, err := h.listStore.CreateList(&list)
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "failed to create list", http.StatusInternalServerError)
+		h.logger.Panicf("ERROR: createList: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "failed to create list"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(createdList)
+	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{"list": createdList})
 }
 
 func (h *ListHandler) HandleUpdateListById(w http.ResponseWriter, r *http.Request) {
-	paramsListID := chi.URLParam(r, "id")
-	if paramsListID == "" {
-		http.NotFound(w, r)
-		return
-	}
-
-	listID, err := strconv.ParseInt(paramsListID, 10, 64)
+	listID, err := utils.ReadIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
+		h.logger.Panicf("ERROR: readIDParam: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid list id"})
 		return
 	}
 
 	existingList, err := h.listStore.GetListByID(listID)
 	if err != nil {
-		http.Error(w, "failed to fetch list", http.StatusInternalServerError)
+		h.logger.Panicf("ERROR: getListById: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "failed to fetch list"})
 		return
 	}
 
 	if existingList == nil {
-		http.NotFound(w, r)
+		h.logger.Panicf("ERROR: getListByID: %v", err)
+		utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "list not found"})
 		return
 	}
 
@@ -103,7 +94,8 @@ func (h *ListHandler) HandleUpdateListById(w http.ResponseWriter, r *http.Reques
 
 	err = json.NewDecoder(r.Body).Decode(&updateListRequest)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.logger.Panicf("ERROR: decodingUpdateRequest: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid request payload"})
 		return
 	}
 
@@ -121,39 +113,34 @@ func (h *ListHandler) HandleUpdateListById(w http.ResponseWriter, r *http.Reques
 
 	err = h.listStore.UpdateList(existingList)
 	if err != nil {
-		fmt.Println("update list error", err)
-		http.Error(w, "failed to update the list", http.StatusInternalServerError)
+		h.logger.Panicf("ERROR: updatingList: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "failed to update list"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(existingList)
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"list": existingList})
 }
 
 func (h *ListHandler) HandleDeleteList(w http.ResponseWriter, r *http.Request) {
-	paramsListID := chi.URLParam(r, "id")
-	if paramsListID == "" {
-		http.NotFound(w, r)
-		return
-	}
-
-	listID, err := strconv.ParseInt(paramsListID, 10, 64)
+	listID, err := utils.ReadIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
+		h.logger.Panicf("ERROR: readIDParam: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid list id"})
 		return
 	}
 
 	err = h.listStore.DeleteList(listID)
 	if err == sql.ErrNoRows {
-		http.Error(w, "list not found", http.StatusNotFound)
+		h.logger.Panicf("ERROR: deletingList: %v", err)
+		utils.WriteJSON(w, http.StatusNotFound, utils.Envelope{"error": "list does not exist"})
 		return
 	}
 
 	if err != nil {
-		http.Error(w, "failed to delete list", http.StatusInternalServerError)
+		h.logger.Panicf("ERROR: deletingList: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "failed to delete list"})
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	utils.WriteJSON(w, http.StatusNoContent, utils.Envelope{"list": "deleted successfully"})
 }
