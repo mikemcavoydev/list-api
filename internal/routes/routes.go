@@ -11,6 +11,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	r.Get("/health", app.HealthCheck)
 	r.Get("/lists/{id}", app.ListHandler.HandleGetListById)
 	r.Post("/lists", app.ListHandler.HandleCreateListById)
+	r.Put("/lists/{id}", app.ListHandler.HandleUpdateListById)
+	r.Delete("/lists/{id}", app.ListHandler.HandleDeleteList)
 
 	return r
 }

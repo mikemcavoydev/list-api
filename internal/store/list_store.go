@@ -21,6 +21,7 @@ type ListStore interface {
 	CreateList(list *List) (*List, error)
 	GetListByID(id int64) (*List, error)
 	UpdateList(list *List) error
+	DeleteList(id int64) error
 }
 
 type PostgresListStore struct {
@@ -101,4 +102,68 @@ func (s *PostgresListStore) GetListByID(id int64) (*List, error) {
 	}
 
 	return list, nil
+}
+
+func (s *PostgresListStore) UpdateList(list *List) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query :=
+		`UPDATE lists SET title = $1, description = $2 WHERE id = $3`
+
+	result, err := tx.Exec(query, list.Title, list.Description, list.ID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	_, err = tx.Exec(`DELETE FROM list_entries WHERE list_id = $1`, list.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range list.Entries {
+		query := `
+			INSERT INTO list_entries (title, order_index, list_id) 
+			VALUES ($1, $2, $3)`
+
+		_, err := tx.Exec(query, entry.Title, entry.OrderIndex, list.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *PostgresListStore) DeleteList(id int64) error {
+	query :=
+		`DELETE from lists WHERE id = $1`
+
+	result, err := s.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }

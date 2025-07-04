@@ -14,3 +14,20 @@ curl -X POST http://localhost:8080/lists \
             }
         ]
     }'
+
+curl -X PUT http://localhost:8080/lists/1 \
+    -H "Content-Type: application/json" \
+    -d '{
+        "title": "Test List Modified",
+        "description": "A list for testing purposes",
+        "entries": [
+            {
+                "title": "First list entry modified",
+                "order_index": 0
+            },
+            {
+                "title": "Second list entry modified",
+                "order_index": 1
+            }
+        ]
+    }'
