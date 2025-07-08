@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/mikemcavoydev/list-api/internal/api"
+	"github.com/mikemcavoydev/list-api/internal/middleware"
 	"github.com/mikemcavoydev/list-api/internal/store"
 	"github.com/mikemcavoydev/list-api/migrations"
 )
@@ -17,6 +18,7 @@ type Application struct {
 	ListHandler  *api.ListHandler
 	UserHandler  *api.UserHandler
 	TokenHandler *api.TokenHandler
+	Middleware   middleware.UserMiddleware
 	DB           *sql.DB
 }
 
@@ -42,11 +44,16 @@ func NewApplication() (*Application, error) {
 	tokenStore := store.NewPostgresTokenStore(pgDB)
 	tokenHandler := api.NewTokenHandler(tokenStore, userStore, logger)
 
+	middlewareHandler := middleware.UserMiddleware{
+		UserStore: userStore,
+	}
+
 	app := &Application{
 		Logger:       logger,
 		ListHandler:  listHandler,
 		UserHandler:  userHandler,
 		TokenHandler: tokenHandler,
+		Middleware:   middlewareHandler,
 		DB:           pgDB,
 	}
 

@@ -9,6 +9,7 @@ type List struct {
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
 	Entries     []ListEntry `json:"entries"`
+	UserID      int         `json:"user_id"`
 }
 
 type ListEntry struct {
@@ -22,6 +23,7 @@ type ListStore interface {
 	GetListByID(id int64) (*List, error)
 	UpdateList(list *List) error
 	DeleteList(id int64) error
+	GetListOwner(id int64) (int, error)
 }
 
 type PostgresListStore struct {
@@ -40,9 +42,9 @@ func (s *PostgresListStore) CreateList(list *List) (*List, error) {
 	defer tx.Rollback()
 
 	query :=
-		`INSERT INTO lists (title, description) VALUES ($1, $2) RETURNING id`
+		`INSERT INTO lists (user_id, title, description) VALUES ($1, $2, $3) RETURNING id`
 
-	err = tx.QueryRow(query, list.Title, list.Description).Scan(&list.ID)
+	err = tx.QueryRow(query, list.UserID, list.Title, list.Description).Scan(&list.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +70,9 @@ func (s *PostgresListStore) GetListByID(id int64) (*List, error) {
 	list := &List{}
 
 	query :=
-		`SELECT id, title, description FROM lists WHERE id = $1`
+		`SELECT id, title, description, user_id FROM lists WHERE id = $1`
 
-	err := s.db.QueryRow(query, id).Scan(&list.ID, &list.Title, &list.Description)
+	err := s.db.QueryRow(query, id).Scan(&list.ID, &list.Title, &list.Description, &list.UserID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -135,10 +137,10 @@ func (s *PostgresListStore) UpdateList(list *List) error {
 
 	for _, entry := range list.Entries {
 		query := `
-			INSERT INTO list_entries (title, order_index, list_id) 
-			VALUES ($1, $2, $3)`
+			INSERT INTO list_entries (title, order_index, list_id, user_id) 
+			VALUES ($1, $2, $3, $4)`
 
-		_, err := tx.Exec(query, entry.Title, entry.OrderIndex, list.ID)
+		_, err := tx.Exec(query, entry.Title, entry.OrderIndex, list.ID, list.UserID)
 		if err != nil {
 			return err
 		}
@@ -166,4 +168,18 @@ func (s *PostgresListStore) DeleteList(id int64) error {
 	}
 
 	return nil
+}
+
+func (s *PostgresListStore) GetListOwner(id int64) (int, error) {
+	var userID int
+
+	query :=
+		`SELECT user_id FROM lists WHERE id = $1`
+
+	err := s.db.QueryRow(query, id).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
 }
